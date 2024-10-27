@@ -1,2 +1,5 @@
 .stack-work/
+.vscode/*
+.vscode
 *~
+.vscode/launch.json
