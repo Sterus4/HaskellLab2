@@ -1,12 +1,27 @@
+{-# LANGUAGE InstanceSigs #-}
 module Lib
-    ( someFunc
+    (
+    OADict(..),
+    emptyDict,
+    
+    getDataAsList,
+    
+    insert,
+    delete,
+
+    filterV,
+    filterKV,
+    
+    fromList,
+    addAll,
+
+    get,
+    size
     ) where
 import Data.Ix()
-import GHC.Arr
-import Data.Maybe (isNothing)
-
-someFunc :: IO ()
-someFunc = print a1
+import GHC.Arr ( (!), (//), array, elems, Array )
+import Data.Maybe (isNothing, isJust)
+import Data.List (sort, groupBy)
 
 class Hash a where
     hash :: a -> Int
@@ -15,12 +30,7 @@ instance Hash Int where
     hash a = a
 
 instance (Show key, Show value) => Show (OADict key value) where
-    show oad = "Max size:\t"  ++ show (maxSize oad) ++ "\nCurrent size:\t" ++ show (currentSize oad) ++ "\nLoad factor:\t" ++ show (loadFactor oad) ++ "\ndata :::\n" ++ show (arrayData oad)
-
-data Cond a = a :? a
-(?) :: Bool -> Cond a -> a
-True  ? (x :? _) = x
-False ? (_ :? y) = y
+    show oad = "Max size:\t"  ++ show (maxSize oad) ++ "\nCurrent size:\t" ++ show (currentSize oad) ++ "\nLoad factor:\t" ++ show (loadFactor oad) ++ "\ndata :::\n" ++ show (getDataAsList oad)
 
 data OADict key value = OADictCons
     {
@@ -34,8 +44,6 @@ emptyDict :: OADict key value
 emptyDict =
     OADictCons {maxSize = 8, currentSize = 0, loadFactor = 0.75, arrayData = array (0, 7) [(i, (Nothing, Nothing)) | i <- [0..7]]}
 
-a1 :: OADict Int Char
-a1 = emptyDict
 
 findFreePlace :: Eq k => k -> Int -> Array Int (Maybe k, a) -> Int
 findFreePlace key firstPosition arr =
@@ -73,7 +81,7 @@ insert key value oad =
                         litsOfElem = getDataAsList oad
             insertNormal =
                 OADictCons (currentSize oad + (if isNothing (fst (arrayData oad ! position)) then 1 else 0)) (maxSize oad) (loadFactor oad) newData
-                    where 
+                    where
                         newData = arrayData oad//[(position, (Just key, Just value))]
                         position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad)
 
@@ -84,11 +92,66 @@ get key oad =
 
 
 fromList :: (Hash k, Eq k) => [(k, v)] -> OADict k v
-fromList [] = emptyDict
-fromList ((k1, v1):kvs) = insert k1 v1 (fromList kvs)
-a2 :: OADict Int Char
-a2 = fromList [(1, 'a'), (2, 'b'), (3, 'n'), (9, 'm'), (10, 'l')]
+--fromList ((k1, v1):kvs) = insert k1 v1 (fromList kvs)
+fromList = foldr (uncurry insert) emptyDict
 
 addAll :: (Hash k, Eq k) => [(k, v)] -> OADict k v -> OADict k v
 addAll [] oad = oad
 addAll ((k1, v1):xs) oad = insert k1 v1 (addAll xs oad)
+
+delete :: (Hash k, Eq k) => k -> OADict k v -> OADict k v
+delete key oad =
+    OADictCons (currentSize oad - (if isNothing (fst (arrayData oad ! position)) then 0 else 1)) (maxSize oad) (loadFactor oad) newData
+        where
+            newData = arrayData oad//[(position, (Nothing, Nothing))]
+            position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad)
+
+-- Тут есть вариант делать прямо полную свертку вместе с ключами, но можно объяснить, почему и так нормально:
+instance Foldable (OADict k) where
+    foldr :: (a -> b -> b) -> b -> OADict k a -> b
+    foldr f acc oad = foldr f acc $ map snd (getDataAsList oad)
+
+instance Functor (OADict k) where
+    fmap :: (a -> b) -> OADict k a -> OADict k b
+    fmap f oad =
+        OADictCons (currentSize oad) (maxSize oad) (loadFactor oad) newData
+        where 
+            newData = fmap f' (arrayData oad)
+            f' (a, b) = case (a, b) of
+                (Nothing, _) -> (Nothing, Nothing)
+                (_, Nothing) -> (Nothing, Nothing)
+                (a1, Just b1) -> (a1, Just (f b1))
+
+filterV :: (a -> Bool) -> OADict k a -> OADict k a
+filterV f oad =
+    OADictCons currentSize' (maxSize oad) (loadFactor oad) newData
+    where 
+        newData = fmap f' (arrayData oad)
+        f' (a1, b1) = case (a1, b1) of
+            (Nothing, _) -> (Nothing, Nothing)
+            (_, Nothing) -> (Nothing, Nothing)
+            (Just a2, Just b2) -> if f b2 then (Just a2, Just b2) else (Nothing, Nothing)
+        currentSize' = length $ filter (\(a, _) -> isJust a) (elems newData)
+
+filterKV :: ((k, v) -> Bool) -> OADict k v -> OADict k v
+filterKV f oad =
+    OADictCons currentSize' (maxSize oad) (loadFactor oad) newData
+    where 
+        newData = fmap f' (arrayData oad)
+        f' (a1, b1) = case (a1, b1) of
+            (Nothing, _) -> (Nothing, Nothing)
+            (_, Nothing) -> (Nothing, Nothing)
+            (Just a2, Just b2) -> if f(a2, b2) then (Just a2, Just b2) else (Nothing, Nothing)
+        currentSize' = length $ filter (\(a, _) -> isJust a) (elems newData)
+
+
+
+instance (Ord k, Ord  v, Hash k, Eq k) => Semigroup (OADict k v) where
+    (<>) :: OADict k v -> OADict k v -> OADict k v
+    oad1 <> oad2 = fromList $ map head (groupBy (\x y -> fst x == fst y) (sort (getDataAsList oad1 ++ getDataAsList oad2)))
+
+instance (Ord k, Ord  v, Hash k, Eq k) => Monoid (OADict k v) where
+    mempty = emptyDict
+
+size :: OADict k v -> Int
+size = currentSize
