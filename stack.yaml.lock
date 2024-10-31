@@ -18,6 +18,13 @@ packages:
       size: 315
   original:
     hackage: haskell-dap-0.0.16.0@sha256:5ee4fba7ce1b8220f486a5251a941e6cd739ab2330e8f25efc5af553a4e1c61d,944
+- completed:
+    hackage: hashable-1.4.3.0@sha256:f3bf68acfa0df7a064a378ef2cdcfeb55e6fb96100675f4c593556dcbf3d7194,4718
+    pantry-tree:
+      sha256: abef0611d6a717ba351317bdb603ef536659e7767a49ba81b2dbe20994065c7d
+      size: 1248
+  original:
+    hackage: hashable-1.4.3.0
 snapshots:
 - completed:
     sha256: 6c5aeace2ca5ecde793a9e0acfaa730ec8f384aa2f6183a2a252f5f9ec55d623

@@ -3,15 +3,15 @@ module Lib
     (
     OADict(..),
     emptyDict,
-    
+
     getDataAsList,
-    
+
     insert,
     delete,
 
     filterV,
     filterKV,
-    
+
     fromList,
     addAll,
 
@@ -22,14 +22,9 @@ import Data.Ix()
 import GHC.Arr ( (!), (//), array, elems, Array )
 import Data.Maybe (isNothing, isJust)
 import Data.List (sort, groupBy)
+import Data.Hashable(Hashable, hash)
 
-class Hash a where
-    hash :: a -> Int
-
-instance Hash Int where
-    hash a = a
-
-instance (Show key, Show value) => Show (OADict key value) where
+instance (Hashable key, Show key, Show value) => Show (OADict key value) where
     show oad = "Max size:\t"  ++ show (maxSize oad) ++ "\nCurrent size:\t" ++ show (currentSize oad) ++ "\nLoad factor:\t" ++ show (loadFactor oad) ++ "\ndata :::\n" ++ show (getDataAsList oad)
 
 data OADict key value = OADictCons
@@ -70,9 +65,9 @@ getDataAsList oad =
 --     (Nothing, Nothing), 
 --     (Just 55, Nothing)]
 
-insert :: (Hash k, Eq k) => k -> v -> OADict k v -> OADict k v
+insert :: (Hashable k) => k -> v -> OADict k v -> OADict k v
 insert key value oad =
-    if fromIntegral (currentSize oad + 1) >= (loadFactor oad * fromIntegral (maxSize oad)) then regeneratedDict else insertNormal
+    if fromIntegral (currentSize oad + 1) >= loadFactor oad * fromIntegral (maxSize oad) then regeneratedDict else insertNormal
         where
             regeneratedDict =
                 insert key value (addAll litsOfElem generatedDict)
@@ -85,21 +80,22 @@ insert key value oad =
                         newData = arrayData oad//[(position, (Just key, Just value))]
                         position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad)
 
-get :: (Hash k, Eq k) => k -> OADict k v -> Maybe v
+get :: (Hashable k) => k -> OADict k v -> Maybe v
 get key oad =
     let position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad) in
         snd (arrayData oad ! position)
 
 
-fromList :: (Hash k, Eq k) => [(k, v)] -> OADict k v
+fromList :: (Hashable k) => [(k, v)] -> OADict k v
 --fromList ((k1, v1):kvs) = insert k1 v1 (fromList kvs)
 fromList = foldr (uncurry insert) emptyDict
 
-addAll :: (Hash k, Eq k) => [(k, v)] -> OADict k v -> OADict k v
+addAll :: (Hashable k) => [(k, v)] -> OADict k v -> OADict k v
 addAll [] oad = oad
 addAll ((k1, v1):xs) oad = insert k1 v1 (addAll xs oad)
 
-delete :: (Hash k, Eq k) => k -> OADict k v -> OADict k v
+
+delete :: (Hashable k) => k -> OADict k v -> OADict k v
 delete key oad =
     OADictCons (currentSize oad - (if isNothing (fst (arrayData oad ! position)) then 0 else 1)) (maxSize oad) (loadFactor oad) newData
         where
@@ -115,7 +111,7 @@ instance Functor (OADict k) where
     fmap :: (a -> b) -> OADict k a -> OADict k b
     fmap f oad =
         OADictCons (currentSize oad) (maxSize oad) (loadFactor oad) newData
-        where 
+        where
             newData = fmap f' (arrayData oad)
             f' (a, b) = case (a, b) of
                 (Nothing, _) -> (Nothing, Nothing)
@@ -125,7 +121,7 @@ instance Functor (OADict k) where
 filterV :: (a -> Bool) -> OADict k a -> OADict k a
 filterV f oad =
     OADictCons currentSize' (maxSize oad) (loadFactor oad) newData
-    where 
+    where
         newData = fmap f' (arrayData oad)
         f' (a1, b1) = case (a1, b1) of
             (Nothing, _) -> (Nothing, Nothing)
@@ -136,22 +132,33 @@ filterV f oad =
 filterKV :: ((k, v) -> Bool) -> OADict k v -> OADict k v
 filterKV f oad =
     OADictCons currentSize' (maxSize oad) (loadFactor oad) newData
-    where 
+    where
         newData = fmap f' (arrayData oad)
         f' (a1, b1) = case (a1, b1) of
             (Nothing, _) -> (Nothing, Nothing)
             (_, Nothing) -> (Nothing, Nothing)
-            (Just a2, Just b2) -> if f(a2, b2) then (Just a2, Just b2) else (Nothing, Nothing)
+            (Just a2, Just b2) -> if f (a2, b2) then (Just a2, Just b2) else (Nothing, Nothing)
         currentSize' = length $ filter (\(a, _) -> isJust a) (elems newData)
 
 
 
-instance (Ord k, Ord  v, Hash k, Eq k) => Semigroup (OADict k v) where
+instance (Ord k, Ord v, Hashable k, Eq k) => Semigroup (OADict k v) where
     (<>) :: OADict k v -> OADict k v -> OADict k v
     oad1 <> oad2 = fromList $ map head (groupBy (\x y -> fst x == fst y) (sort (getDataAsList oad1 ++ getDataAsList oad2)))
 
-instance (Ord k, Ord  v, Hash k, Eq k) => Monoid (OADict k v) where
+instance (Ord k, Ord v, Hashable k, Eq k) => Monoid (OADict k v) where
     mempty = emptyDict
 
 size :: OADict k v -> Int
 size = currentSize
+
+-- TODO
+instance (Hashable k, Eq v) => Eq (OADict k v) where
+    (==) :: OADict k v -> OADict k v -> Bool
+    (==) oad1 oad2 = currentSize oad1 == currentSize oad2
+        && maxSize oad1 == maxSize oad2
+        && haveAll (getDataAsList oad1) oad2
+        && haveAll (getDataAsList oad2) oad1 where
+            haveAll :: (Hashable a, Eq b) => [(a, b)] -> OADict a b -> Bool
+            haveAll [] _ = True
+            haveAll (x:xs) oad = get (fst x) oad == Just (snd x) && haveAll xs oad
