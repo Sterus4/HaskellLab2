@@ -1,0 +1,29 @@
+name: lint
+on: push
+jobs:
+  hlint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: 'Set up HLint'
+      uses: rwe/actions-hlint-setup@v1
+      with:
+        version: '3.1.6'
+
+    - name: 'Run HLint'
+      uses: rwe/actions-hlint-run@v2
+      with:
+        path: '["src/", "app/"]'
+        fail-on: suggestion
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: 'Set up HUnit'
+      run:
+        stack install HUnit
+    - name: 'Run Tests'
+      run:
+        stack test

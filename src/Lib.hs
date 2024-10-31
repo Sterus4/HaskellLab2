@@ -5,6 +5,7 @@ module Lib
     emptyDict,
 
     getDataAsList,
+    getValuesData,
 
     insert,
     delete,
@@ -48,6 +49,11 @@ findFreePlace key firstPosition arr =
             if k == key then firstPosition else findFreePlace key (rem (firstPosition + 1) (length arr)) arr
 
 
+get :: (Hashable k) => k -> OADict k v -> Maybe v
+get key oad =
+    let position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad) in
+        snd (arrayData oad ! position)
+
 getDataAsList :: OADict a b -> [(a, b)]
 getDataAsList oad =
     removeMaybe (elems (arrayData oad)) where
@@ -57,6 +63,9 @@ getDataAsList oad =
                 (Nothing, _) -> removeMaybe xs
                 (Just _, Nothing) -> removeMaybe xs
                 (Just a, Just b) -> (a, b) : removeMaybe xs
+
+getValuesData :: OADict a b -> [b]
+getValuesData o = map snd (getDataAsList o)
 -- arr :: Array Int (Maybe Int, Maybe Char)
 -- arr = listArray (0, 4) [
 --     (Nothing, Nothing), 
@@ -80,10 +89,6 @@ insert key value oad =
                         newData = arrayData oad//[(position, (Just key, Just value))]
                         position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad)
 
-get :: (Hashable k) => k -> OADict k v -> Maybe v
-get key oad =
-    let position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad) in
-        snd (arrayData oad ! position)
 
 
 fromList :: (Hashable k) => [(k, v)] -> OADict k v
@@ -156,7 +161,7 @@ size = currentSize
 instance (Hashable k, Eq v) => Eq (OADict k v) where
     (==) :: OADict k v -> OADict k v -> Bool
     (==) oad1 oad2 = currentSize oad1 == currentSize oad2
-        && maxSize oad1 == maxSize oad2
+--TODO  && maxSize oad1 == maxSize oad2
         && haveAll (getDataAsList oad1) oad2
         && haveAll (getDataAsList oad2) oad1 where
             haveAll :: (Hashable a, Eq b) => [(a, b)] -> OADict a b -> Bool
