@@ -63,3 +63,4 @@ tests:
     - lab2
     - HUnit
     - hashable
+    - QuickCheck

@@ -43,15 +43,15 @@ emptyDict =
 
 findFreePlace :: Eq k => k -> Int -> Array Int (Maybe k, a) -> Int
 findFreePlace key firstPosition arr =
-    case arr ! rem firstPosition (length arr) of
-        (Nothing, _) -> rem firstPosition (length arr)
+    case arr ! mod firstPosition (length arr) of
+        (Nothing, _) -> mod firstPosition (length arr)
         (Just k, _) ->
-            if k == key then firstPosition else findFreePlace key (rem (firstPosition + 1) (length arr)) arr
+            if k == key then firstPosition else findFreePlace key (mod (firstPosition + 1) (length arr)) arr
 
 
 get :: (Hashable k) => k -> OADict k v -> Maybe v
 get key oad =
-    let position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad) in
+    let position = findFreePlace key (mod (hash key) (maxSize oad)) (arrayData oad) in
         snd (arrayData oad ! position)
 
 getDataAsList :: OADict a b -> [(a, b)]
@@ -87,7 +87,7 @@ insert key value oad =
                 OADictCons (currentSize oad + (if isNothing (fst (arrayData oad ! position)) then 1 else 0)) (maxSize oad) (loadFactor oad) newData
                     where
                         newData = arrayData oad//[(position, (Just key, Just value))]
-                        position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad)
+                        position = findFreePlace key (mod (hash key) (maxSize oad)) (arrayData oad)
 
 
 
@@ -105,7 +105,7 @@ delete key oad =
     OADictCons (currentSize oad - (if isNothing (fst (arrayData oad ! position)) then 0 else 1)) (maxSize oad) (loadFactor oad) newData
         where
             newData = arrayData oad//[(position, (Nothing, Nothing))]
-            position = findFreePlace key (rem (hash key) (maxSize oad)) (arrayData oad)
+            position = findFreePlace key (mod (hash key) (maxSize oad)) (arrayData oad)
 
 -- Тут есть вариант делать прямо полную свертку вместе с ключами, но можно объяснить, почему и так нормально:
 instance Foldable (OADict k) where
@@ -157,7 +157,6 @@ instance (Ord k, Ord v, Hashable k, Eq k) => Monoid (OADict k v) where
 size :: OADict k v -> Int
 size = currentSize
 
--- TODO
 instance (Hashable k, Eq v) => Eq (OADict k v) where
     (==) :: OADict k v -> OADict k v -> Bool
     (==) oad1 oad2 = currentSize oad1 == currentSize oad2

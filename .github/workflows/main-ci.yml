@@ -1,4 +1,4 @@
-name: lint
+name: main CI
 on: push
 jobs:
   hlint:
@@ -22,8 +22,9 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: 'Set up HUnit'
-      run:
-        stack install HUnit
+      run: |
+        stack install HUnit 
+        stack install QuickCheck
     - name: 'Run Tests'
       run:
         stack test
